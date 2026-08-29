@@ -5,7 +5,7 @@ output "s3_bucket_name" {
 output "s3_bucket_arn" {
   value = aws_s3_bucket.podcast.arn
 }
-
+/*
 output "cloudfront_distribution_id" {
   value = aws_cloudfront_distribution.podcast.id
 }
@@ -13,7 +13,7 @@ output "cloudfront_distribution_id" {
 output "cloudfront_domain_name" {
   value = aws_cloudfront_distribution.podcast.domain_name
 }
-
+*/
 output "podcast_url" {
   value = "https://${var.domain_name}/"
 }
