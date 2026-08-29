@@ -1,3 +1,4 @@
+/*
 data "aws_iam_policy_document" "podcast_bucket" {
   statement {
     sid    = "AllowCloudFrontServicePrincipalReadOnly"
@@ -34,3 +35,4 @@ resource "aws_s3_bucket_policy" "podcast" {
     aws_cloudfront_distribution.podcast
   ]
 }
+*/
