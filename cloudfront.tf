@@ -1,4 +1,3 @@
-
 resource "aws_cloudfront_origin_access_control" "podcast" {
   name                              = "${var.project_name}-s3-oac"
   description                       = "OAC for ${var.project_name} S3 origin"
@@ -7,6 +6,23 @@ resource "aws_cloudfront_origin_access_control" "podcast" {
   signing_protocol                  = "sigv4"
 }
 
+# -------------------------------------------------------------------
+# Basic Auth CloudFront Function
+# -------------------------------------------------------------------
+resource "aws_cloudfront_function" "basic_auth" {
+  name    = "podcast-basic-auth"
+  runtime = "cloudfront-js-2.0"
+  comment = "Basic authentication for private podcast"
+  publish = true
+
+  code = templatefile("${path.module}/basic-auth.js.tftpl", {
+    auth_string = base64encode("${var.basic_auth_username}:${var.basic_auth_password}")
+  })
+}
+
+# -------------------------------------------------------------------
+# CloudFront Distribution
+# -------------------------------------------------------------------
 resource "aws_cloudfront_distribution" "podcast" {
   enabled         = true
   is_ipv6_enabled = var.enable_ipv6
@@ -21,18 +37,9 @@ resource "aws_cloudfront_distribution" "podcast" {
     origin_access_control_id = aws_cloudfront_origin_access_control.podcast.id
   }
 
-  default_cache_behavior {
-    target_origin_id       = "s3-podcast"
-    viewer_protocol_policy = "redirect-to-https"
-
-    allowed_methods = ["GET", "HEAD", "OPTIONS"]
-    cached_methods  = ["GET", "HEAD"]
-
-    compress = true
-
-    cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
-  }
-
+  # -------------------------------------------------------------------
+  # 優先度 1: RSS フィード（認証あり / キャッシュなし）
+  # -------------------------------------------------------------------
   ordered_cache_behavior {
     path_pattern           = "keppyann.rss"
     target_origin_id       = "s3-podcast"
@@ -42,19 +49,16 @@ resource "aws_cloudfront_distribution" "podcast" {
     cached_methods  = ["GET", "HEAD"]
 
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.basic_auth.arn
+    }
   }
 
-  ordered_cache_behavior {
-    path_pattern           = "healthcheck.txt"
-    target_origin_id       = "s3-podcast"
-    viewer_protocol_policy = "redirect-to-https"
-
-    allowed_methods = ["GET", "HEAD"]
-    cached_methods  = ["GET", "HEAD"]
-
-    cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
-  }
-
+  # -------------------------------------------------------------------
+  # 優先度 2: 音声ファイル（認証あり / キャッシュあり）
+  # -------------------------------------------------------------------
   ordered_cache_behavior {
     path_pattern           = "arch/*"
     target_origin_id       = "s3-podcast"
@@ -66,6 +70,45 @@ resource "aws_cloudfront_distribution" "podcast" {
     compress = false
 
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.basic_auth.arn
+    }
+  }
+
+  # -------------------------------------------------------------------
+  # 優先度 3: ヘルスチェック（認証除外 / 監視用）
+  # -------------------------------------------------------------------
+  ordered_cache_behavior {
+    path_pattern           = "healthcheck.txt"
+    target_origin_id       = "s3-podcast"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+
+    cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
+  }
+
+  # -------------------------------------------------------------------
+  # デフォルト: その他全般（認証あり）
+  # -------------------------------------------------------------------
+  default_cache_behavior {
+    target_origin_id       = "s3-podcast"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD", "OPTIONS"]
+    cached_methods  = ["GET", "HEAD"]
+
+    compress = true
+
+    cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
+
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.basic_auth.arn
+    }
   }
 
   restrictions {
@@ -87,22 +130,13 @@ resource "aws_cloudfront_distribution" "podcast" {
   tags = local.common_tags
 }
 
+# -------------------------------------------------------------------
+# Cache Policies
+# -------------------------------------------------------------------
 data "aws_cloudfront_cache_policy" "caching_optimized" {
   name = "Managed-CachingOptimized"
 }
 
 data "aws_cloudfront_cache_policy" "caching_disabled" {
   name = "Managed-CachingDisabled"
-}
-
-resource "aws_cloudfront_function" "basic_auth" {
-  name    = "podcast-basic-auth"
-  runtime = "cloudfront-js-2.0"
-  comment = "Basic authentication for private podcast"
-  publish = true
-
-  # パスワード文字列を動的に生成して挿入
-  code = templatefile("${path.module}/basic-auth.js.tftpl", {
-    auth_string = base64encode("${var.basic_auth_username}:${var.basic_auth_password}")
-  })
 }
