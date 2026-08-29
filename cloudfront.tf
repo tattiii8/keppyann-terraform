@@ -92,6 +92,25 @@ resource "aws_cloudfront_distribution" "podcast" {
   }
 
   # -------------------------------------------------------------------
+  # 画像ファイル専用設定（認証なし / キャッシュあり）
+  # -------------------------------------------------------------------
+  ordered_cache_behavior {
+    path_pattern           = "*.png" # または "images/*" など配置パスに合わせる
+    target_origin_id       = "s3-podcast"
+    viewer_protocol_policy = "redirect-to-https"
+
+    allowed_methods = ["GET", "HEAD"]
+    cached_methods  = ["GET", "HEAD"]
+
+    compress = true
+
+    # 画像はキャッシュを効かせる
+    cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
+
+    # ★ function_association をつけないことで認証を除外
+  }
+
+  # -------------------------------------------------------------------
   # デフォルト: その他全般（認証あり）
   # -------------------------------------------------------------------
   default_cache_behavior {
