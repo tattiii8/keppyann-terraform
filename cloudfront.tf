@@ -1,4 +1,4 @@
-resource "aws_cloudfront_origin_access_control" "podcast" {
+/*resource "aws_cloudfront_origin_access_control" "podcast" {
   name                              = "${var.project_name}-s3-oac"
   description                       = "OAC for ${var.project_name} S3 origin"
   origin_access_control_origin_type = "s3"
@@ -93,3 +93,4 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
 data "aws_cloudfront_cache_policy" "caching_disabled" {
   name = "Managed-CachingDisabled"
 }
+*/
