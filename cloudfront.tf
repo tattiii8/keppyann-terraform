@@ -34,7 +34,7 @@ resource "aws_cloudfront_distribution" "podcast" {
   }
 
   ordered_cache_behavior {
-    path_pattern           = "feed.xml"
+    path_pattern           = "keppyann.rss"
     target_origin_id       = "s3-podcast"
     viewer_protocol_policy = "redirect-to-https"
 
