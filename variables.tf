@@ -37,3 +37,15 @@ variable "price_class" {
   type    = string
   default = "PriceClass_200"
 }
+
+variable "basic_auth_username" {
+  type        = string
+  description = "Basic auth username"
+  sensitive   = true
+}
+
+variable "basic_auth_password" {
+  type        = string
+  description = "Basic auth password"
+  sensitive   = true
+}

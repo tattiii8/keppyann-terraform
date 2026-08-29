@@ -1,0 +1,19 @@
+function handler(event) {
+    var request = event.request;
+    var headers = request.headers;
+
+    // Terraform から注入される Base64 文字列
+    var authString = "Basic ${auth_string}";
+
+    if (typeof headers.authorization === 'undefined' || headers.authorization.value !== authString) {
+        return {
+            statusCode: 401,
+            statusDescription: 'Unauthorized',
+            headers: {
+                "www-authenticate": { value: 'Basic realm="Podcast Access"' }
+            }
+        };
+    }
+
+    return request;
+}

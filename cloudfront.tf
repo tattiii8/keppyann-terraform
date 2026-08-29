@@ -94,3 +94,15 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
 data "aws_cloudfront_cache_policy" "caching_disabled" {
   name = "Managed-CachingDisabled"
 }
+
+resource "aws_cloudfront_function" "basic_auth" {
+  name    = "podcast-basic-auth"
+  runtime = "cloudfront-js-2.0"
+  comment = "Basic authentication for private podcast"
+  publish = true
+
+  # パスワード文字列を動的に生成して挿入
+  code = templatefile("${path.module}/basic-auth.js.tftpl", {
+    auth_string = base64encode("${var.basic_auth_username}:${var.basic_auth_password}")
+  })
+}
