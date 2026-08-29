@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Project name used in resource names."
   type        = string
-  default     = "podcast"
+  default     = "keppyann"
 }
 
 variable "domain_name" {
