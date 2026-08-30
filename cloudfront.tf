@@ -41,7 +41,7 @@ resource "aws_cloudfront_distribution" "podcast" {
   # 優先度 1: RSS フィード（認証あり / キャッシュなし）
   # -------------------------------------------------------------------
   ordered_cache_behavior {
-    path_pattern           = "keppyann.rss"
+    path_pattern           = "/arch/keppyann.rss"
     target_origin_id       = "s3-podcast"
     viewer_protocol_policy = "redirect-to-https"
 
