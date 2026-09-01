@@ -50,10 +50,6 @@ resource "aws_cloudfront_distribution" "podcast" {
 
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
 
-    function_association {
-      event_type   = "viewer-request"
-      function_arn = aws_cloudfront_function.basic_auth.arn
-    }
   }
 
   # -------------------------------------------------------------------
