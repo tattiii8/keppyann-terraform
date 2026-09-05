@@ -5,7 +5,13 @@ function handler(event) {
     // Terraform から注入される Base64 文字列
     var authString = "Basic ${auth_string}";
 
+    // ★ ログ出力: リクエストURIとクライアントIP
+    console.log("Request URI: " + request.uri + " | Client IP: " + event.viewer.ip);
+
     if (typeof headers.authorization === 'undefined' || headers.authorization.value !== authString) {
+        // ★ ログ出力: 認証失敗
+        console.log("Auth Failed for URI: " + request.uri);
+
         return {
             statusCode: 401,
             statusDescription: 'Unauthorized',
@@ -14,6 +20,9 @@ function handler(event) {
             }
         };
     }
+
+    // ★ ログ出力: 認証成功
+    console.log("Auth Success for URI: " + request.uri);
 
     return request;
 }
