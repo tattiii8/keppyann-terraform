@@ -1,3 +1,29 @@
+# -------------------------------------------------------------------
+# CloudFront Log Bucket (S3)
+# -------------------------------------------------------------------
+resource "aws_s3_bucket" "cloudfront_logs" {
+  bucket        = "${var.project_name}-cloudfront-logs"
+  force_destroy = true
+}
+
+# CloudFront Standard Logging には ACL 有効化が必要
+resource "aws_s3_bucket_ownership_controls" "cloudfront_logs" {
+  bucket = aws_s3_bucket.cloudfront_logs.id
+  rule {
+    object_ownership = "BucketOwnerPreferred"
+  }
+}
+
+resource "aws_s3_bucket_acl" "cloudfront_logs" {
+  depends_on = [aws_s3_bucket_ownership_controls.cloudfront_logs]
+
+  bucket = aws_s3_bucket.cloudfront_logs.id
+  acl    = "private"
+}
+
+# -------------------------------------------------------------------
+# Resource: Origin Access Control
+# -------------------------------------------------------------------
 resource "aws_cloudfront_origin_access_control" "podcast" {
   name                              = "${var.project_name}-s3-oac"
   description                       = "OAC for ${var.project_name} S3 origin"
@@ -30,6 +56,13 @@ resource "aws_cloudfront_distribution" "podcast" {
   comment         = "Podcast delivery for ${var.domain_name}"
 
   aliases = [var.domain_name]
+
+  # ★ アクセスログ設定を追加
+  logging_config {
+    include_cookies = false
+    bucket          = aws_s3_bucket.cloudfront_logs.bucket_domain_name
+    prefix          = "cf-logs/"
+  }
 
   origin {
     domain_name              = aws_s3_bucket.podcast.bucket_regional_domain_name
@@ -70,11 +103,6 @@ resource "aws_cloudfront_distribution" "podcast" {
     compress = false
 
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
-
-    #function_association {
-    #  event_type   = "viewer-request"
-    #  function_arn = aws_cloudfront_function.basic_auth.arn
-    #}
   }
 
   # -------------------------------------------------------------------
@@ -95,7 +123,7 @@ resource "aws_cloudfront_distribution" "podcast" {
   # 画像ファイル専用設定（認証なし / キャッシュあり）
   # -------------------------------------------------------------------
   ordered_cache_behavior {
-    path_pattern           = "*.png" # または "images/*" など配置パスに合わせる
+    path_pattern           = "*.png"
     target_origin_id       = "s3-podcast"
     viewer_protocol_policy = "redirect-to-https"
 
@@ -104,10 +132,7 @@ resource "aws_cloudfront_distribution" "podcast" {
 
     compress = true
 
-    # 画像はキャッシュを効かせる
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
-
-    # ★ function_association をつけないことで認証を除外
   }
 
   # -------------------------------------------------------------------
@@ -143,7 +168,8 @@ resource "aws_cloudfront_distribution" "podcast" {
   }
 
   depends_on = [
-    aws_acm_certificate.podcast
+    aws_acm_certificate.podcast,
+    aws_s3_bucket_acl.cloudfront_logs # ★ ACL 設定の完了を保証
   ]
 
   tags = local.common_tags
@@ -158,4 +184,60 @@ data "aws_cloudfront_cache_policy" "caching_optimized" {
 
 data "aws_cloudfront_cache_policy" "caching_disabled" {
   name = "Managed-CachingDisabled"
+}
+
+# -------------------------------------------------------------------
+# Athena Setup for Log Analytics
+# -------------------------------------------------------------------
+resource "aws_athena_database" "cloudfront_logs" {
+  name   = replace("${var.project_name}_cloudfront_logs_db", "-", "_")
+  bucket = aws_s3_bucket.cloudfront_logs.bucket
+}
+
+resource "aws_athena_named_query" "create_cloudfront_logs_table" {
+  name     = "create-cloudfront-logs-table"
+  database = aws_athena_database.cloudfront_logs.name
+  query    = <<-SQL
+    CREATE EXTERNAL TABLE IF NOT EXISTS ${aws_athena_database.cloudfront_logs.name}.cloudfront_logs (
+      `date` DATE,
+      `time` STRING,
+      `location` STRING,
+      `bytes` BIGINT,
+      `c_ip` STRING,
+      `method` STRING,
+      `host` STRING,
+      `uri_stem` STRING,
+      `status` INT,
+      `referrer` STRING,
+      `user_agent` STRING,
+      `uri_query` STRING,
+      `cookie` STRING,
+      `edge_result_type` STRING,
+      `request_id` STRING,
+      `host_header` STRING,
+      `cs_protocol` STRING,
+      `cs_bytes` BIGINT,
+      `time_taken` FLOAT,
+      `xforwarded_for` STRING,
+      `ssl_protocol` STRING,
+      `ssl_cipher` STRING,
+      `edge_response_result_type` STRING,
+      `cs_protocol_version` STRING,
+      `fle_status` STRING,
+      `fle_encrypted_fields` INT,
+      `c_port` INT,
+      `time_to_first_byte` FLOAT,
+      `x_edge_detailed_result_type` STRING,
+      `sc_content_type` STRING,
+      `sc_content_len` BIGINT,
+      `sc_range_start` BIGINT,
+      `sc_range_end` BIGINT
+    )
+    ROW FORMAT DELIMITED 
+    FIELDS TERMINATED BY '\t'
+    LOCATION 's3://${aws_s3_bucket.cloudfront_logs.bucket}/cf-logs/'
+    TBLPROPERTIES (
+      'skip.header.line.count'='2'
+    );
+  SQL
 }
