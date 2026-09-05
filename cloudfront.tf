@@ -103,8 +103,12 @@ resource "aws_cloudfront_distribution" "podcast" {
     compress = false
 
     cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
-  }
 
+    function_association {
+      event_type   = "viewer-request"
+      function_arn = aws_cloudfront_function.basic_auth.arn
+    }
+  }
   # -------------------------------------------------------------------
   # 優先度 3: ヘルスチェック（認証除外 / 監視用）
   # -------------------------------------------------------------------
@@ -155,9 +159,10 @@ resource "aws_cloudfront_distribution" "podcast" {
     }
   }
 
-  restrictions {
+restrictions {
     geo_restriction {
-      restriction_type = "none"
+      restriction_type = "whitelist"
+      locations        = ["JP"]
     }
   }
 
