@@ -2,15 +2,42 @@ function handler(event) {
     var request = event.request;
     var headers = request.headers;
 
+    // 1. クライアント情報の取得
+    var clientIp = event.viewer ? event.viewer.ip : "unknown";
+    var country = (event.viewer && event.viewer.country) ? event.viewer.country : "XX";
+    var userAgentHeader = headers['user-agent'];
+    var userAgent = userAgentHeader ? userAgentHeader.value : "";
+
     // Terraform から注入される Base64 文字列
     var authString = "Basic ${auth_string}";
 
-    // ★ ログ出力: リクエストURIとクライアントIP
-    console.log("Request URI: " + request.uri + " | Client IP: " + event.viewer.ip);
+    // ★ ログ出力: 基本アクセス情報 (国コードを追加)
+    console.log("[Access] IP: " + clientIp + " | Country: " + country + " | URI: " + request.uri + " | UA: " + userAgent);
 
+    // 2. 例外許可（ポッドキャストクローラー等）の判定
+    // Overcast などのクローラーは Basic 認証および国判定をバイパスして許可
+    if (userAgent.indexOf("Overcast") !== -1) {
+        console.log("[Allow] Bypassed Auth/Geo for Podcast Crawler (Overcast) | IP: " + clientIp);
+        return request;
+    }
+
+    // 3. 国制限判定 (日本以外を拒否する場合)
+    // ※ CloudFront 本体の GeoRestriction を無効にし、ここで判定します
+    if (country !== "JP") {
+        console.log("[Blocked] GeoBlocked (Non-JP: " + country + ") | IP: " + clientIp + " | URI: " + request.uri);
+        return {
+            statusCode: 403,
+            statusDescription: 'Forbidden',
+            headers: {
+                "content-type": { value: "text/plain" }
+            },
+            body: "Access denied from your location (" + country + ")."
+        };
+    }
+
+    // 4. Basic 認証の判定
     if (typeof headers.authorization === 'undefined' || headers.authorization.value !== authString) {
-        // ★ ログ出力: 認証失敗
-        console.log("Auth Failed for URI: " + request.uri);
+        console.log("[Blocked] Auth Failed | IP: " + clientIp + " | URI: " + request.uri);
 
         return {
             statusCode: 401,
@@ -21,8 +48,8 @@ function handler(event) {
         };
     }
 
-    // ★ ログ出力: 認証成功
-    console.log("Auth Success for URI: " + request.uri);
+    // 5. すべてのチェックを通過（認証成功）
+    console.log("[Allow] Auth Success | IP: " + clientIp + " | URI: " + request.uri);
 
     return request;
 }

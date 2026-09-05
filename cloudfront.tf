@@ -161,8 +161,9 @@ resource "aws_cloudfront_distribution" "podcast" {
 
 restrictions {
     geo_restriction {
-      restriction_type = "whitelist"
-      locations        = ["JP"]
+      # "whitelist" から "none" に変更
+      restriction_type = "none"
+      locations        = []
     }
   }
 
