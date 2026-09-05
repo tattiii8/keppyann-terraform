@@ -47,6 +47,32 @@ resource "aws_cloudfront_function" "basic_auth" {
 }
 
 # -------------------------------------------------------------------
+# Origin Request Policy (国識別ヘッダー転送用) ★追加
+# -------------------------------------------------------------------
+resource "aws_cloudfront_origin_request_policy" "viewer_country" {
+  name    = "${var.project_name}-viewer-country-policy"
+  comment = "Pass CloudFront-Viewer-Country and User-Agent headers to CloudFront Function and Origin"
+
+  cookies_config {
+    cookie_behavior = "none"
+  }
+
+  headers_config {
+    header_behavior = "whitelist"
+    headers {
+      items = [
+        "CloudFront-Viewer-Country",
+        "User-Agent"
+      ]
+    }
+  }
+
+  query_strings_config {
+    query_string_behavior = "none"
+  }
+}
+
+# -------------------------------------------------------------------
 # CloudFront Distribution
 # -------------------------------------------------------------------
 resource "aws_cloudfront_distribution" "podcast" {
@@ -57,7 +83,7 @@ resource "aws_cloudfront_distribution" "podcast" {
 
   aliases = [var.domain_name]
 
-  # ★ アクセスログ設定を追加
+  # ★ アクセスログ設定
   logging_config {
     include_cookies = false
     bucket          = aws_s3_bucket.cloudfront_logs.bucket_domain_name
@@ -81,7 +107,8 @@ resource "aws_cloudfront_distribution" "podcast" {
     allowed_methods = ["GET", "HEAD"]
     cached_methods  = ["GET", "HEAD"]
 
-    cache_policy_id = data.aws_cloudfront_cache_policy.caching_disabled.id
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_disabled.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.viewer_country.id # ★追加
 
     function_association {
       event_type   = "viewer-request"
@@ -102,13 +129,15 @@ resource "aws_cloudfront_distribution" "podcast" {
 
     compress = false
 
-    cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_optimized.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.viewer_country.id # ★追加
 
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.basic_auth.arn
     }
   }
+
   # -------------------------------------------------------------------
   # 優先度 3: ヘルスチェック（認証除外 / 監視用）
   # -------------------------------------------------------------------
@@ -151,7 +180,8 @@ resource "aws_cloudfront_distribution" "podcast" {
 
     compress = true
 
-    cache_policy_id = data.aws_cloudfront_cache_policy.caching_optimized.id
+    cache_policy_id          = data.aws_cloudfront_cache_policy.caching_optimized.id
+    origin_request_policy_id = aws_cloudfront_origin_request_policy.viewer_country.id # ★追加
 
     function_association {
       event_type   = "viewer-request"
@@ -159,9 +189,8 @@ resource "aws_cloudfront_distribution" "podcast" {
     }
   }
 
-restrictions {
+  restrictions {
     geo_restriction {
-      # "whitelist" から "none" に変更
       restriction_type = "none"
       locations        = []
     }
