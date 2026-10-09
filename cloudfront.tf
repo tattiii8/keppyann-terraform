@@ -35,6 +35,8 @@ resource "aws_cloudfront_origin_access_control" "podcast" {
 # -------------------------------------------------------------------
 # Basic Auth CloudFront Function
 # -------------------------------------------------------------------
+
+/*
 resource "aws_cloudfront_function" "basic_auth" {
   name    = "podcast-basic-auth"
   runtime = "cloudfront-js-2.0"
@@ -45,6 +47,7 @@ resource "aws_cloudfront_function" "basic_auth" {
     auth_string = base64encode("${var.basic_auth_username}:${var.basic_auth_password}")
   })
 }
+*/
 
 # -------------------------------------------------------------------
 # Origin Request Policy (国識別ヘッダー転送用) ★追加
@@ -113,8 +116,9 @@ resource "aws_cloudfront_distribution" "podcast" {
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.basic_auth.arn
-    }
+    }*/
   }
+
 
   # -------------------------------------------------------------------
   # 優先度 2: 音声ファイル（認証あり / キャッシュあり）
@@ -135,7 +139,7 @@ resource "aws_cloudfront_distribution" "podcast" {
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.basic_auth.arn
-    }
+    }*/
   }
 
   # -------------------------------------------------------------------
@@ -186,7 +190,7 @@ resource "aws_cloudfront_distribution" "podcast" {
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.basic_auth.arn
-    }
+    }*/
   }
 
   restrictions {
