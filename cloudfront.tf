@@ -135,7 +135,7 @@ resource "aws_cloudfront_distribution" "podcast" {
 
     cache_policy_id          = data.aws_cloudfront_cache_policy.caching_optimized.id
     origin_request_policy_id = aws_cloudfront_origin_request_policy.viewer_country.id # ★追加
-
+/*
     function_association {
       event_type   = "viewer-request"
       function_arn = aws_cloudfront_function.basic_auth.arn
